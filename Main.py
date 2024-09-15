@@ -1,121 +1,128 @@
 import tkinter as tk
-from tkinter import simpledialog
-import subprocess
-import os
-import json
 import spacy
-from fuzzywuzzy import process  # Import fuzzywuzzy for fuzzy matching
+import re
 
-# Load spaCy model
+# Load the spaCy model
 nlp = spacy.load("en_core_web_trf")
 
+# Define the context manager class
+class ContextManager:
+    def __init__(self):
+        self.context = []
+
+    def update_context(self, text):
+        self.context.append(text)
+        if len(self.context) > 5:  # Keep only the last 5 messages
+            self.context.pop(0)
+
+    def get_context(self):
+        return " ".join(self.context)
+
+context_manager = ContextManager()
+
 # Definitions dictionary
-definitions = {
+dictionary = {
     "PlayStation 5": "PlayStation 5 is a home video game console developed by Sony Interactive Entertainment, released in 2020.",
     "Xbox Series X": "Xbox Series X is a home video game console developed by Microsoft, released in 2020.",
     "Windows 11": "Windows 11 is an operating system developed by Microsoft, released in 2021.",
-    "macOS Ventura": "macOS Ventura is the operating system for Apple's Mac computers, released in 2022.",
-    "JavaScript": "JavaScript is a programming language used primarily for adding interactivity to web pages.",
-    "HTML": "HTML stands for HyperText Markup Language and is used to create the structure of web pages.",
-    "CSS": "CSS stands for Cascading Style Sheets and is used to style the appearance of web pages.",
-    "Node.js": "Node.js is an open-source, cross-platform JavaScript runtime environment that executes JavaScript code outside a web browser.",
-    "Express.js": "Express.js is a minimal and flexible Node.js web application framework that provides a robust set of features for building web and mobile applications.",
-    "API": "API stands for Application Programming Interface. It is a set of rules and tools for building software applications, allowing different software systems to communicate with each other.",
-    "JSON": "JSON stands for JavaScript Object Notation. It is a lightweight data-interchange format that is easy for humans to read and write and easy for machines to parse and generate.",
-    "REST": "REST stands for Representational State Transfer. It is an architectural style for designing networked applications using stateless, client-server communication.",
-    "The Legend of Zelda: Breath of the Wild": "An action-adventure game developed and published by Nintendo, released in 2017.",
-    "Super Mario Odyssey": "A platform game developed and published by Nintendo, released in 2017.",
-    "Minecraft": "A sandbox video game developed by Mojang Studios, originally released in 2011.",
-    "Animal Crossing: New Horizons": "A life simulation video game developed and published by Nintendo, released in 2020.",
-    "The Legend of Zelda: Tears of the Kingdom": "An action-adventure game developed and published by Nintendo, released on May 12, 2023.",
-    "Fortnite": "Fortnite is an online video game developed by Epic Games, featuring a battle royale mode where players fight to be the last one standing.",
-    "Among Us": "Among Us is an online multiplayer social deduction game developed by InnerSloth, where players work to complete tasks while impostors attempt to sabotage their efforts.",
-    "Genshin Impact": "Genshin Impact is an open-world action role-playing game developed and published by miHoYo, released in 2020.",
-    "Overwatch": "Overwatch is a team-based first-person shooter game developed and published by Blizzard Entertainment, featuring a diverse cast of characters.",
-    "Wikipedia": "Wikipedia is a free online encyclopedia with articles written by volunteers and edited by anyone with internet access.",
-    "Python": "Python is a high-level, interpreted programming language known for its readability and versatility, used in web development, data analysis, artificial intelligence, and more.",
-    "Cloud Computing": "Cloud computing is the delivery of computing services—including servers, storage, databases, networking, software, and more—over the internet (the cloud).",
-    "Machine Learning": "Machine learning is a branch of artificial intelligence that involves the development of algorithms that allow computers to learn from and make predictions based on data.",
-    "Blockchain": "Blockchain is a decentralized digital ledger that records transactions across many computers so that the record cannot be altered retroactively.",
-    "Internet of Things (IoT)": "IoT refers to the interconnected network of physical devices that collect and exchange data using embedded sensors, software, and other technologies.",
-    "Virtual Reality (VR)": "Virtual Reality is a simulated experience that can be similar to or completely different from the real world, often experienced through VR headsets.",
-    "Augmented Reality (AR)": "Augmented Reality overlays digital information on the real world, often viewed through devices like smartphones or AR glasses.",
-    "Cybersecurity": "Cybersecurity involves the protection of computer systems and networks from digital attacks, theft, and damage.",
 }
 
 # Contextual phrases
 contextual_phrases = {
     "hello": "Hi there! How can I assist you today?",
     "hi": "Hello! What can I do for you?",
-    "wow": "That's interesting! What else can I help you with?",
-    "cool": "Nice! Do you have any other questions?",
-    "no prob": "No problem! Let me know if you need anything else.",
-    "no problem": "No problem! Feel free to ask more.",
-    "awesome": "Awesome! How can I assist you further?",
-    "amazing": "That's amazing! What else would you like to know?",
-    "magnificent": "Magnificent! Is there anything else you'd like to discuss?",
 }
 
-def process_input(user_input):
-    user_input_lower = user_input.lower()
-    
+# Conversational phrases
+conversational_phrases = {
+    "what's up": "Not much! Just here to help you out.",
+    "how are you": "I'm just a bot, but I'm doing great! How about you?",
+}
+
+# Memes and humorous responses
+memes = {
+    "touch grass": "Sorry, What?.",
+    "ping me": "Sorry, I'm not sure what that means.",
+}
+
+# Helper function for whole word matching
+def find_best_match(text, dictionary):
+    text = text.lower()
+    for term in dictionary:
+        if re.search(r'\b' + re.escape(term.lower()) + r'\b', text):
+            return term
+    return None
+
+# Function to handle user input
+def get_response(user_input):
+    user_input = user_input.lower()
+    doc = nlp(user_input)
+    response = None
+
+    # Update and retrieve context
+    context_manager.update_context(user_input)
+    context = context_manager.get_context()
+
     # Check for contextual phrases
-    for phrase, response in contextual_phrases.items():
-        if phrase in user_input_lower:
-            return response
+    for phrase in contextual_phrases:
+        if re.search(r'\b' + re.escape(phrase) + r'\b', user_input):
+            response = contextual_phrases[phrase]
+            break
 
-    # Fuzzy match for definitions
-    term, score = process.extractOne(user_input, definitions.keys())
-    if score > 80:  # Threshold for fuzzy matching
-        definition = definitions[term]
-        return f"The {term} is {definition}. Did that help?"
+    # Check for conversational phrases
+    if response is None:
+        for phrase in conversational_phrases:
+            if re.search(r'\b' + re.escape(phrase) + r'\b', user_input):
+                response = conversational_phrases[phrase]
+                break
 
-    return "Sorry, I don't know what that means."
+    # Check for definitions
+    if response is None:
+        best_match = find_best_match(user_input, dictionary)
+        if best_match:
+            response = f"The {best_match} is {dictionary[best_match]}. Did that help?"
 
+    # Check for memes
+    if response is None:
+        for meme in memes:
+            if re.search(r'\b' + re.escape(meme) + r'\b', user_input):
+                response = memes[meme]
+                break
+
+    # Default response
+    if response is None:
+        response = "Sorry, I don't know what that means."
+
+    return response
+
+# Function to handle user input
 def send_message():
-    user_input = input_entry.get()
-    response = process_input(user_input)
-    output_text.config(state=tk.NORMAL)
-    output_text.insert(tk.END, f"User: {user_input}\nBot: {response}\n\n")
-    output_text.config(state=tk.DISABLED)
+    user_message = user_input_entry.get()
+    bot_response = get_response(user_message)
+    
+    # Update chatlog
+    chatlog.config(state=tk.NORMAL)
+    chatlog.insert(tk.END, f"User: {user_message}\n")
+    chatlog.insert(tk.END, f"Bot: {bot_response}\n")
+    chatlog.config(state=tk.DISABLED)
+    
+    # Clear user input field
+    user_input_entry.delete(0, tk.END)
 
-def open_definitions_updater():
-    word = simpledialog.askstring("Input", "Enter the word:")
-    definition = simpledialog.askstring("Input", "Enter the definition:")
-    if word and definition:
-        # Update the definitions dictionary
-        global definitions
-        definitions[word] = definition
-        
-        # Save definitions to a file
-        with open('definitions.txt', 'a') as file:
-            file.write(f"{word}:{definition}\n")
-        
-        output_text.config(state=tk.NORMAL)
-        output_text.insert(tk.END, f"Definition for '{word}' updated.\n\n")
-        output_text.config(state=tk.DISABLED)
-
-def create_settings_menu():
-    settings_menu = tk.Toplevel()
-    settings_menu.title("Settings Menu")
-
-    update_button = tk.Button(settings_menu, text="Update Definitions", command=open_definitions_updater)
-    update_button.pack(pady=20)
-
-# Main UI
+# Initialize the Tkinter window
 root = tk.Tk()
-root.title("AI Chatbot")
+root.title("NTGGt Chatbot")
 
-input_entry = tk.Entry(root, width=50)
-input_entry.pack(pady=10)
+# Chatlog display (output box)
+chatlog = tk.Text(root, state=tk.DISABLED, wrap=tk.WORD, width=50, height=20)
+chatlog.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
 
+# User input field
+user_input_entry = tk.Entry(root, width=40)
+user_input_entry.grid(row=1, column=0, padx=10, pady=10)
+
+# Send button
 send_button = tk.Button(root, text="Send", command=send_message)
-send_button.pack(pady=5)
-
-output_text = tk.Text(root, wrap=tk.WORD, state=tk.DISABLED, height=15, width=50)
-output_text.pack(pady=10)
-
-settings_button = tk.Button(root, text="Settings", command=create_settings_menu)
-settings_button.pack(pady=10)
+send_button.grid(row=1, column=1, padx=10, pady=10)
 
 root.mainloop()
